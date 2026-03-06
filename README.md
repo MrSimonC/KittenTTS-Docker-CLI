@@ -4,15 +4,6 @@ This repository packages a self-contained Docker image for running a persistent 
 
 It is intentionally limited to the Docker runtime plus a lightweight local wrapper script for host playback. The heavy TTS runtime stays inside Docker.
 
-## Default Runtime Contract
-
-- Host port: `59151`
-- Health endpoint: `http://127.0.0.1:59151/healthz`
-- Voices endpoint: `http://127.0.0.1:59151/voices`
-- Direct TTS endpoint: `http://127.0.0.1:59151/tts`
-- Generated audio endpoint: `http://127.0.0.1:59151/audio/<id>.wav`
-- Container behavior: `restart: unless-stopped`
-
 The default baked model is `KittenML/kitten-tts-mini-0.8`.
 The running container reads the baked model from the image itself, so changing `.env` only takes effect after a rebuild.
 
@@ -44,6 +35,13 @@ This builds the image with the default `kitten-tts-mini-0.8` model and starts a 
 
 If your main goal is "say something aloud when the AI finishes its turn", use the local wrapper command.
 
+Typical flow:
+
+1. Start the Docker service with `docker compose up -d --build`
+2. Confirm the server is up with `curl http://127.0.0.1:59151/healthz`
+3. List available voices with `python3 kittentts_say.py --list-voices`
+4. Speak text with `python3 kittentts_say.py --voice Bella "Finished on one"`
+
 List voices:
 
 ```bash
@@ -60,6 +58,18 @@ Print the generated URL without playing it:
 
 ```bash
 python3 kittentts_say.py --voice Bruno --no-play --print-url "Finished on two"
+```
+
+Save the WAV to a chosen host path:
+
+```bash
+python3 kittentts_say.py --voice Luna --output ./finished.wav "Job completed"
+```
+
+Generate the file without playback and print the downloaded path:
+
+```bash
+python3 kittentts_say.py --no-play --print-path "Background task finished"
 ```
 
 This wrapper talks to the Docker server over `http://127.0.0.1:59151`, downloads the generated WAV to a local temp file, and plays it with native host tooling. No host bind mount is required.
@@ -160,3 +170,12 @@ docker compose up -d
 - The image pre-downloads the selected Hugging Face model during `docker build` so the container can start without fetching model files at runtime.
 - The runtime is CPU-oriented by default.
 - The server exposes lightweight JSON endpoints for health, voices, and synthesis metadata, plus WAV files under `/audio/...`.
+
+## Default Runtime Contract
+
+- Host port: `59151`
+- Health endpoint: `http://127.0.0.1:59151/healthz`
+- Voices endpoint: `http://127.0.0.1:59151/voices`
+- Direct TTS endpoint: `http://127.0.0.1:59151/tts`
+- Generated audio endpoint: `http://127.0.0.1:59151/audio/<id>.wav`
+- Container behavior: `restart: unless-stopped`
