@@ -30,9 +30,8 @@ RUN printf '%s\n' "${KITTENTTS_MODEL}" > /app/baked-model.txt
 FROM python:3.12-slim
 
 ARG KITTENTTS_MODEL=KittenML/kitten-tts-mini-0.8
-ENV MCP_TRANSPORT=streamable-http
-ENV FASTMCP_HOST=0.0.0.0
-ENV FASTMCP_PORT=8000
+ENV KITTENTTS_HOST=0.0.0.0
+ENV KITTENTTS_PORT=8000
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

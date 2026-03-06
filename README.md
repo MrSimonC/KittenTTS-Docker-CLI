@@ -1,16 +1,16 @@
-# KittenTTS Docker MCP
+# KittenTTS Docker HTTP Server
 
-This repository packages a self-contained Docker image for running a persistent KittenTTS MCP server on a fixed local port.
+This repository packages a self-contained Docker image for running a persistent KittenTTS HTTP server on a fixed local port.
 
-It is intentionally limited to the Docker runtime and its documentation. It does not include the higher-level local skill wrapper or desktop playback helpers.
+It is intentionally limited to the Docker runtime plus a lightweight local wrapper script for host playback. The heavy TTS runtime stays inside Docker.
 
 ## Default Runtime Contract
 
 - Host port: `59151`
-- MCP endpoint: `http://127.0.0.1:59151/mcp`
 - Health endpoint: `http://127.0.0.1:59151/healthz`
 - Voices endpoint: `http://127.0.0.1:59151/voices`
 - Direct TTS endpoint: `http://127.0.0.1:59151/tts`
+- Generated audio endpoint: `http://127.0.0.1:59151/audio/<id>.wav`
 - Container behavior: `restart: unless-stopped`
 
 The default baked model is `KittenML/kitten-tts-mini-0.8`.
@@ -38,27 +38,47 @@ The upstream project notes minor issues with the int8 nano model. Treat `KittenM
 docker compose up -d --build
 ```
 
-This builds the image with the default `kitten-tts-mini-0.8` model and starts a persistent container named `kittentts-mcp`.
+This builds the image with the default `kitten-tts-mini-0.8` model and starts a persistent container named `kittentts-http`.
 
-## Add The MCP Server To CLI Clients
+## Use A Local CLI Notifier
 
-Once the container is running, add the local MCP endpoint to your CLI client.
+If your main goal is "say something aloud when the AI finishes its turn", use the local wrapper command.
 
-Claude Code:
-
-```bash
-claude mcp add --transport http --scope user kittentts http://127.0.0.1:59151/mcp
-claude mcp get kittentts
-```
-
-Codex CLI:
+List voices:
 
 ```bash
-codex mcp add kittentts --url http://127.0.0.1:59151/mcp
-codex mcp list
+python3 kittentts_say.py --list-voices
 ```
 
-If you prefer a repo-local Claude Code configuration instead of a user-level one, replace `--scope user` with `--scope project`.
+Speak custom text with a chosen voice:
+
+```bash
+python3 kittentts_say.py --voice Bella "Finished on one"
+```
+
+Print the generated URL without playing it:
+
+```bash
+python3 kittentts_say.py --voice Bruno --no-play --print-url "Finished on two"
+```
+
+This wrapper talks to the Docker server over `http://127.0.0.1:59151`, downloads the generated WAV to a local temp file, and plays it with native host tooling. No host bind mount is required.
+
+Useful options:
+
+- `--voice <name>` chooses the voice
+- `--list-voices` queries the server for available voices
+- `--speed <value>` changes speech speed
+- `--output <path>` saves the WAV to a specific host path
+- `--no-play` generates the WAV without starting playback
+
+For an agents-file pattern, tell the assistant to run a command such as:
+
+```bash
+python3 /path/to/kittentts-http/kittentts_say.py --voice Bella "Finished on one"
+```
+
+This is the recommended integration point for AI CLI agents: ask the assistant to run the wrapper command at the end of its turn with the text you want spoken.
 
 ## Rebuild With A Different Baked Model
 
@@ -97,16 +117,10 @@ Generate speech:
 curl \
   -X POST http://127.0.0.1:59151/tts \
   -H "Content-Type: application/json" \
-  -d '{"text":"Hello from KittenTTS Docker MCP","voice":"Bruno","speed":1.0}'
+  -d '{"text":"Hello from KittenTTS Docker HTTP","voice":"Bruno","speed":1.0}'
 ```
 
-Probe the MCP endpoint:
-
-```bash
-curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:59151/mcp
-```
-
-A `406` response is expected for this simple probe because the endpoint is live but the request is not performing an MCP handshake.
+That response includes metadata plus a `url` field that points to a downloadable WAV file under `/audio/...`.
 
 ## Operate The Container
 
@@ -145,4 +159,4 @@ docker compose up -d
 
 - The image pre-downloads the selected Hugging Face model during `docker build` so the container can start without fetching model files at runtime.
 - The runtime is CPU-oriented by default.
-- The server exposes Streamable HTTP MCP on `/mcp` and lightweight JSON endpoints for health and direct synthesis.
+- The server exposes lightweight JSON endpoints for health, voices, and synthesis metadata, plus WAV files under `/audio/...`.

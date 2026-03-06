@@ -1,15 +1,14 @@
 services:
-  kittentts-mcp:
+  kittentts-http:
     build:
       context: .
       args:
         KITTENTTS_MODEL: ${KITTENTTS_MODEL:-KittenML/kitten-tts-mini-0.8}
-    image: kittentts-mcp
-    container_name: kittentts-mcp
+    image: kittentts-http
+    container_name: kittentts-http
     ports:
       - "59151:8000"
     environment:
-      MCP_TRANSPORT: streamable-http
-      FASTMCP_HOST: 0.0.0.0
-      FASTMCP_PORT: 8000
+      KITTENTTS_HOST: 0.0.0.0
+      KITTENTTS_PORT: 8000
     restart: unless-stopped

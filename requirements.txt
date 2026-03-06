@@ -3,6 +3,5 @@ numpy
 soundfile
 phonemizer
 huggingface_hub
-mcp[cli]
 uvicorn
 starlette
