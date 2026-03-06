@@ -9,6 +9,8 @@ The running container reads the baked model from the image itself, so changing `
 
 ## Supported Baked Models
 
+See the upstream model repository for project details and model context: [KittenML/KittenTTS: State-of-the-art TTS model under 25MB 😻](https://github.com/KittenML/KittenTTS)
+
 Set `KITTENTTS_MODEL` at build time to bake exactly one model into the image:
 
 - `KittenML/kitten-tts-mini-0.8`
