@@ -196,11 +196,46 @@ def main() -> int:
 
     response = synthesize(base_url, text=text, voice=args.voice, speed=args.speed)
 
-    output_path = Path(args.output) if args.output else Path(tempfile.gettempdir()) / response["filename"]
-    download_file(response["url"], output_path)
+    # Determine output path robustly: prefer explicit --output, then response["filename"],
+    # then derive from response URL, and finally fall back to a unique temp filename.
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        filename = response.get("filename")
+        if not filename:
+            # Try to derive filename from the returned URL
+            url = response.get("url", "")
+            parsed = urllib.parse.urlparse(url)
+            filename = os.path.basename(parsed.path) if parsed.path else None
+            if not filename:
+                # Fallback: create a unique temp filename
+                with tempfile.NamedTemporaryFile(prefix="kittentts_", suffix=".wav", delete=False) as tmp:
+                    filename = Path(tmp.name).name
+        output_path = Path(tempfile.gettempdir()) / filename
+
+    url = response.get("url")
+    wav_b64 = response.get("wav_b64")
+    if url:
+        download_file(url, output_path)
+    elif wav_b64:
+        import base64
+
+        try:
+            data = base64.b64decode(wav_b64)
+            with output_path.open("wb") as f:
+                f.write(data)
+        except Exception as exc:
+            raise SystemExit(f"Failed to write decoded audio: {exc}") from exc
+    else:
+        raise SystemExit(
+            f"Synthesis response missing 'url' and 'wav_b64'. Full response: {json.dumps(response)}"
+        )
 
     if args.print_url:
-        print(response["url"])
+        if url:
+            print(url)
+        else:
+            print("")
     if args.print_path:
         print(output_path)
 

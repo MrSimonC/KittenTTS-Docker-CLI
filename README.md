@@ -1,29 +1,108 @@
-# KittenTTS Docker HTTP Server
+# KittenTTS LLM Skill + Docker Service
 
 ![KittenTTS Docker CLI hero image](./assets/kitten-tts-docker-cli-hero.png)
 
-This repository packages KittenTTS as a small local Docker service plus a simple CLI wrapper so AI tools can generate spoken notifications on demand.
+This repository is primarily a reusable `skills/kitten-tts` package for LLMs that want to speak short status updates aloud through a local KittenTTS Docker service.
 
-The main use case is AI-agent completion speech: an agent finishes its work, says which workspace it was working in, and announces what it changed. The heavy text-to-speech runtime stays inside Docker, while the lightweight `kittentts_say.py` command runs on the host and plays the generated WAV locally.
+Use it when you want an agent to finish work and say something like "Finished on SecondCopy: updated the README" without keeping the full TTS runtime installed on the host.
 
-In practice, this repo gives you:
+What this repo gives you:
 
-- a persistent local HTTP service for text-to-speech generation
-- a host-side CLI command that requests speech and plays it back
-- a reusable `kitten-tts` skill that agents can install into their local skills directory
-- a clean way to hook spoken status updates into Codex, Claude, or similar CLI agents
-
-One example workflow is:
-
-1. An AI coding agent completes a task
-2. The agent knows which local copy it was working in, such as `Studio`, `SecondCopy`, or `ThirdCopy`
-3. The agent runs `kittentts_say.py` with a short completion message such as `Finished on one: updated the build script`
-4. You hear the result immediately without opening the terminal output first
-
-This is intentionally limited to the Docker runtime, the local playback wrapper, and the reusable skill that ties them together.
+- a persistent local Docker HTTP service for KittenTTS
+- a reusable `skills/kitten-tts` folder you can copy into an LLM skill directory
+- a bundled wrapper script at `skills/kitten-tts/scripts/kittentts_say.py`
+- a simple direct-invocation path for testing the wrapper outside the skill system
 
 The default baked model is `KittenML/kitten-tts-mini-0.8`.
 The running container reads the baked model from the image itself, so changing `.env` only takes effect after a rebuild.
+
+## Setup
+
+### 1. Run the Docker service first
+
+Start the local KittenTTS server:
+
+```bash
+docker compose up -d --build
+```
+
+Verify it is healthy:
+
+```bash
+curl http://127.0.0.1:59151/healthz
+```
+
+This builds the image with the default `kitten-tts-mini-0.8` model and starts a persistent container named `kittentts-http`.
+
+### 2. Hook the skill into your LLM
+
+Copy the included skill into whatever local skill directory your agent reads from:
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R ./skills/kitten-tts ~/.agents/skills/kitten-tts
+```
+
+Common locations include:
+
+```text
+~/.agents/skills/kitten-tts
+~/.codex/skills/kitten-tts
+```
+
+The skill tells the LLM to use the bundled wrapper script from the skill folder, default to `Bruno` unless another voice was requested, and prefer `--text` so the spoken message is preserved exactly.
+
+Once installed, an LLM can run commands like:
+
+```bash
+./scripts/kittentts_say.py --voice Bruno --text "Hello, I am Bruno, your AI assistant. How can I help you today?"
+```
+
+If your agent requires an absolute path, point it at the copied skill directory's script.
+
+### 3. Test the bundled script directly
+
+You can also run the same bundled wrapper yourself without going through an LLM skill:
+
+List voices:
+
+```bash
+python3 ./skills/kitten-tts/scripts/kittentts_say.py --list-voices
+```
+
+Speak custom text with a chosen voice:
+
+```bash
+python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Bella "Finished on one"
+```
+
+Print the generated URL without playing it:
+
+```bash
+python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Bruno --no-play --print-url "Finished on two"
+```
+
+Save the WAV to a chosen host path:
+
+```bash
+python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Luna --output ./finished.wav "Job completed"
+```
+
+Generate the file without playback and print the downloaded path:
+
+```bash
+python3 ./skills/kitten-tts/scripts/kittentts_say.py --no-play --print-path "Background task finished"
+```
+
+This wrapper talks to the Docker server over `http://127.0.0.1:59151`, downloads the generated WAV to a local temp file, and plays it with native host tooling. No host bind mount is required.
+
+Useful options:
+
+- `--voice <name>` chooses the voice
+- `--list-voices` queries the server for available voices
+- `--speed <value>` changes speech speed
+- `--output <path>` saves the WAV to a specific host path
+- `--no-play` generates the WAV without starting playback
 
 ## Supported Baked Models
 
@@ -38,112 +117,7 @@ Set `KITTENTTS_MODEL` at build time to bake exactly one model into the image:
 
 The upstream project notes minor issues with the int8 nano model. Treat `KittenML/kitten-tts-nano-0.8-int8` as supported with caveats rather than the safest default.
 
-## Requirements
-
-- Docker
-- Docker Compose
-
-## Start The Default Server
-
-```bash
-docker compose up -d --build
-```
-
-This builds the image with the default `kitten-tts-mini-0.8` model and starts a persistent container named `kittentts-http`.
-
-## Use A Local CLI Notifier
-
-If your main goal is "say something aloud when the AI finishes its turn", use the local wrapper command.
-
-Typical flow:
-
-1. Start the Docker service with `docker compose up -d --build`
-2. Confirm the server is up with `curl http://127.0.0.1:59151/healthz`
-3. List available voices with `python3 kittentts_say.py --list-voices`
-4. Speak text with `python3 kittentts_say.py --voice Bella "Finished on one"`
-
-List voices:
-
-```bash
-python3 kittentts_say.py --list-voices
-```
-
-Speak custom text with a chosen voice:
-
-```bash
-python3 kittentts_say.py --voice Bella "Finished on one"
-```
-
-Print the generated URL without playing it:
-
-```bash
-python3 kittentts_say.py --voice Bruno --no-play --print-url "Finished on two"
-```
-
-Save the WAV to a chosen host path:
-
-```bash
-python3 kittentts_say.py --voice Luna --output ./finished.wav "Job completed"
-```
-
-Generate the file without playback and print the downloaded path:
-
-```bash
-python3 kittentts_say.py --no-play --print-path "Background task finished"
-```
-
-This wrapper talks to the Docker server over `http://127.0.0.1:59151`, downloads the generated WAV to a local temp file, and plays it with native host tooling. No host bind mount is required.
-
-Useful options:
-
-- `--voice <name>` chooses the voice
-- `--list-voices` queries the server for available voices
-- `--speed <value>` changes speech speed
-- `--output <path>` saves the WAV to a specific host path
-- `--no-play` generates the WAV without starting playback
-
-For an agents-file pattern, tell the assistant to run a command such as:
-
-```bash
-python3 /path/to/kittentts-http/kittentts_say.py --voice Bella "Finished on one"
-```
-
-This is the recommended integration point for AI CLI agents: ask the assistant to run the wrapper command at the end of its turn with the text you want spoken.
-
-## Reuse The Included Skill
-
-This repo also includes a reusable skill under `skills/kitten-tts` so other people can drop the same voice-command behavior into their local agent setup.
-
-Recommended shared install location:
-
-```bash
-mkdir -p ~/.agents/skills
-cp -R ./skills/kitten-tts ~/.agents/skills/kitten-tts
-```
-
-Using a home-level `~/.agents/skills` directory is a simple shared pattern that works well for both Codex and Claude setups that read skills from the user's home directory.
-
-Example skill locations:
-
-```text
-~/.agents/skills/kitten-tts
-~/.codex/skills/kitten-tts
-```
-
-After copying the skill, an agent can use it to say messages such as:
-
-```bash
-kittentts_say.py --voice Bruno --text "Hello, I am Bruno, your AI assistant. How can I help you today?"
-```
-
-The included skill tells the agent to:
-
-- check that `kittentts_say.py` is available on `PATH`
-- direct the user to this repository if the command is not installed
-- use `Bruno` by default unless the user requests a different voice
-- prefer `--text` so the spoken message is preserved exactly
-
-## Rebuild With A Different Baked Model
+## Rebuild with a different baked model
 
 Option 1: use an environment variable for a one-off build.
 
@@ -160,21 +134,15 @@ docker compose up -d --build
 
 If you change `KITTENTTS_MODEL` later, rebuild the image again before restarting the container.
 
-## Verify The Server
+## Verify the server
 
-Health check:
-
-```bash
-curl http://127.0.0.1:59151/healthz
-```
-
-List voices:
+List voices directly from the HTTP API:
 
 ```bash
 curl http://127.0.0.1:59151/voices
 ```
 
-Generate speech:
+Generate speech directly:
 
 ```bash
 curl \
@@ -185,7 +153,7 @@ curl \
 
 That response includes metadata plus a `url` field that points to a downloadable WAV file under `/audio/...`.
 
-## Operate The Container
+## Operate the container
 
 View logs:
 
@@ -224,7 +192,7 @@ docker compose up -d
 - The runtime is CPU-oriented by default.
 - The server exposes lightweight JSON endpoints for health, voices, and synthesis metadata, plus WAV files under `/audio/...`.
 
-## Default Runtime Contract
+## Default runtime contract
 
 - Host port: `59151`
 - Health endpoint: `http://127.0.0.1:59151/healthz`
