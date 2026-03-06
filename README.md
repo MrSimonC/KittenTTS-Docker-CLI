@@ -40,6 +40,26 @@ docker compose up -d --build
 
 This builds the image with the default `kitten-tts-mini-0.8` model and starts a persistent container named `kittentts-mcp`.
 
+## Add The MCP Server To CLI Clients
+
+Once the container is running, add the local MCP endpoint to your CLI client.
+
+Claude Code:
+
+```bash
+claude mcp add --transport http --scope user kittentts http://127.0.0.1:59151/mcp
+claude mcp get kittentts
+```
+
+Codex CLI:
+
+```bash
+codex mcp add kittentts --url http://127.0.0.1:59151/mcp
+codex mcp list
+```
+
+If you prefer a repo-local Claude Code configuration instead of a user-level one, replace `--scope user` with `--scope project`.
+
 ## Rebuild With A Different Baked Model
 
 Option 1: use an environment variable for a one-off build.
