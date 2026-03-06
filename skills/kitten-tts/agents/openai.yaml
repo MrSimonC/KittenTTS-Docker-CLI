@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kitten TTS"
+  short_description: "Speak messages with local KittenTTS CLI"
+  default_prompt: "Use $kitten-tts to say a short message with the local kittentts_say.py command."

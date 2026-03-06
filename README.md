@@ -92,6 +92,39 @@ python3 /path/to/kittentts-http/kittentts_say.py --voice Bella "Finished on one"
 
 This is the recommended integration point for AI CLI agents: ask the assistant to run the wrapper command at the end of its turn with the text you want spoken.
 
+## Reuse The Included Skill
+
+This repo also includes a reusable skill under `skills/kitten-tts` so other people can drop the same voice-command behavior into their local agent setup.
+
+Recommended shared install location:
+
+```bash
+mkdir -p ~/.agents/skills
+cp -R ./skills/kitten-tts ~/.agents/skills/kitten-tts
+```
+
+Using a home-level `~/.agents/skills` directory is a simple shared pattern that works well for both Codex and Claude setups that read skills from the user's home directory.
+
+Example skill locations:
+
+```text
+~/.agents/skills/kitten-tts
+~/.codex/skills/kitten-tts
+```
+
+After copying the skill, an agent can use it to say messages such as:
+
+```bash
+kittentts_say.py --voice Bruno --text "Hello, I am Bruno, your AI assistant. How can I help you today?"
+```
+
+The included skill tells the agent to:
+
+- check that `kittentts_say.py` is available on `PATH`
+- direct the user to this repository if the command is not installed
+- use `Bruno` by default unless the user requests a different voice
+- prefer `--text` so the spoken message is preserved exactly
+
 ## Rebuild With A Different Baked Model
 
 Option 1: use an environment variable for a one-off build.
