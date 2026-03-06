@@ -47,7 +47,8 @@ Common locations include:
 
 ```text
 ~/.agents/skills/kitten-tts
-~/.codex/skills/kitten-tts
+~/.copilot/skills/kitten-tts
+~/.claude/skills/kitten-tts
 ```
 
 The skill tells the LLM to use the bundled wrapper script from the skill folder, default to `Bruno` unless another voice was requested, and prefer `--text` so the spoken message is preserved exactly.
