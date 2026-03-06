@@ -1,8 +1,26 @@
 # KittenTTS Docker HTTP Server
 
-This repository packages a self-contained Docker image for running a persistent KittenTTS HTTP server on a fixed local port.
+![KittenTTS Docker CLI hero image](./assets/kitten-tts-docker-cli-hero.png)
 
-It is intentionally limited to the Docker runtime plus a lightweight local wrapper script for host playback. The heavy TTS runtime stays inside Docker.
+This repository packages KittenTTS as a small local Docker service plus a simple CLI wrapper so AI tools can generate spoken notifications on demand.
+
+The main use case is AI-agent completion speech: an agent finishes its work, says which workspace it was working in, and announces what it changed. The heavy text-to-speech runtime stays inside Docker, while the lightweight `kittentts_say.py` command runs on the host and plays the generated WAV locally.
+
+In practice, this repo gives you:
+
+- a persistent local HTTP service for text-to-speech generation
+- a host-side CLI command that requests speech and plays it back
+- a reusable `kitten-tts` skill that agents can install into their local skills directory
+- a clean way to hook spoken status updates into Codex, Claude, or similar CLI agents
+
+One example workflow is:
+
+1. An AI coding agent completes a task
+2. The agent knows which local copy it was working in, such as `Studio`, `SecondCopy`, or `ThirdCopy`
+3. The agent runs `kittentts_say.py` with a short completion message such as `Finished on one: updated the build script`
+4. You hear the result immediately without opening the terminal output first
+
+This is intentionally limited to the Docker runtime, the local playback wrapper, and the reusable skill that ties them together.
 
 The default baked model is `KittenML/kitten-tts-mini-0.8`.
 The running container reads the baked model from the image itself, so changing `.env` only takes effect after a rebuild.
