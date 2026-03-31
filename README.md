@@ -2,68 +2,49 @@
 
 ![KittenTTS Docker CLI hero image](./assets/kitten-tts-docker-cli-hero.png)
 
-This repository is primarily a reusable `skills/kitten-tts` package for LLMs that want to speak short status updates aloud through a local KittenTTS Docker service.
+This repository packages KittenTTS as both:
 
-Use it when you want an agent to finish work and say something like "Finished on SecondCopy: updated the README" without keeping the full TTS runtime installed on the host.
+- a reusable `skills/kitten-tts` folder for LLM tooling
+- a Docker image that exposes a local HTTP service
 
-What this repo gives you:
-
-- a persistent local Docker HTTP service for KittenTTS
-- a reusable `skills/kitten-tts` folder you can copy into an LLM skill directory
-- a bundled wrapper script at `skills/kitten-tts/scripts/kittentts_say.py`
-- a simple direct-invocation path for testing the wrapper outside the skill system
+Use it when you want an agent to finish work and say something out loud without installing the full TTS runtime on the host.
 
 The default baked model is `KittenML/kitten-tts-mini-0.8`.
-The running container reads the baked model from the image itself, so changing `.env` only takes effect after a rebuild.
 
-## Setup
+## Quick start
 
-### 1. Run the Docker service first
-
-Start the local KittenTTS server:
+### 1. Pull and run the published image
 
 ```bash
-docker compose up -d --build
+docker pull ghcr.io/mrsimonc/kittentts-docker-cli:latest
+docker run -d \
+  --name kittentts-http \
+  --restart unless-stopped \
+  -p 59151:8000 \
+  ghcr.io/mrsimonc/kittentts-docker-cli:latest
 ```
 
-Verify it is healthy:
+Verify the service:
 
 ```bash
 curl http://127.0.0.1:59151/healthz
 ```
 
-This builds the image with the default `kitten-tts-mini-0.8` model and starts a persistent container named `kittentts-http`.
-
-### 2. Hook the skill into your LLM
-
-Copy the included skill into whatever local skill directory your agent reads from:
+### 2. Copy the skill into your agent
 
 ```bash
 mkdir -p ~/.agents/skills
 cp -R ./skills/kitten-tts ~/.agents/skills/kitten-tts
 ```
 
-Common locations include:
+Other common skill locations:
 
 ```text
-~/.agents/skills/kitten-tts
 ~/.copilot/skills/kitten-tts
 ~/.claude/skills/kitten-tts
 ```
 
-The skill tells the LLM to use the bundled wrapper script from the skill folder, default to `Bruno` unless another voice was requested, and prefer `--text` so the spoken message is preserved exactly.
-
-Once installed, an LLM can run commands like:
-
-```bash
-./scripts/kittentts_say.py --voice Bruno --text "Hello, I am Bruno, your AI assistant. How can I help you today?"
-```
-
-If your agent requires an absolute path, point it at the copied skill directory's script.
-
-### 3. Test the bundled script directly
-
-You can also run the same bundled wrapper yourself without going through an LLM skill:
+### 3. Test it
 
 List voices:
 
@@ -71,79 +52,61 @@ List voices:
 python3 ./skills/kitten-tts/scripts/kittentts_say.py --list-voices
 ```
 
-Speak custom text with a chosen voice:
+Speak a short message:
 
 ```bash
-python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Bella "Finished on one"
+python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Bella --text "Finished on one"
 ```
 
-Print the generated URL without playing it:
+The wrapper talks to `http://127.0.0.1:59151`, downloads the generated WAV to a temp file, and plays it with native host tooling.
 
-```bash
-python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Bruno --no-play --print-url "Finished on two"
+## Published image
+
+GitHub Actions publishes the container image to:
+
+```text
+ghcr.io/mrsimonc/kittentts-docker-cli:latest
 ```
 
-Save the WAV to a chosen host path:
+The workflow runs on pushes to `main`, and also on the repo's current `master` branch until the default branch is renamed.
 
-```bash
-python3 ./skills/kitten-tts/scripts/kittentts_say.py --voice Luna --output ./finished.wav "Job completed"
-```
+GitHub Container Registry packages are commonly created as private on first publish. If the image is not publicly pullable after the first workflow run, open the package settings in GitHub once and change visibility to **Public**.
 
-Generate the file without playback and print the downloaded path:
+## Build locally with a different baked model
 
-```bash
-python3 ./skills/kitten-tts/scripts/kittentts_say.py --no-play --print-path "Background task finished"
-```
+If you want a different baked-in model than the published default image, build locally instead.
 
-This wrapper talks to the Docker server over `http://127.0.0.1:59151`, downloads the generated WAV to a local temp file, and plays it with native host tooling. No host bind mount is required.
-
-Useful options:
-
-- `--voice <name>` chooses the voice
-- `--list-voices` queries the server for available voices
-- `--speed <value>` changes speech speed
-- `--output <path>` saves the WAV to a specific host path
-- `--no-play` generates the WAV without starting playback
-
-## Supported Baked Models
-
-See the upstream model repository for project details and model context: [KittenML/KittenTTS: State-of-the-art TTS model under 25MB 😻](https://github.com/KittenML/KittenTTS)
-
-Set `KITTENTTS_MODEL` at build time to bake exactly one model into the image:
-
-- `KittenML/kitten-tts-mini-0.8`
-- `KittenML/kitten-tts-micro-0.8`
-- `KittenML/kitten-tts-nano-0.8`
-- `KittenML/kitten-tts-nano-0.8-int8`
-
-The upstream project notes minor issues with the int8 nano model. Treat `KittenML/kitten-tts-nano-0.8-int8` as supported with caveats rather than the safest default.
-
-## Rebuild with a different baked model
-
-Option 1: use an environment variable for a one-off build.
+One-off build:
 
 ```bash
 KITTENTTS_MODEL=KittenML/kitten-tts-micro-0.8 docker compose up -d --build
 ```
 
-Option 2: copy `.env.example` to `.env` and change `KITTENTTS_MODEL` before building.
+Or use `.env`:
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-If you change `KITTENTTS_MODEL` later, rebuild the image again before restarting the container.
+Supported baked models:
 
-## Verify the server
+- `KittenML/kitten-tts-mini-0.8`
+- `KittenML/kitten-tts-micro-0.8`
+- `KittenML/kitten-tts-nano-0.8`
+- `KittenML/kitten-tts-nano-0.8-int8`
 
-List voices directly from the HTTP API:
+If you change `KITTENTTS_MODEL`, rebuild the image before restarting the container.
+
+## API quick check
+
+List voices:
 
 ```bash
 curl http://127.0.0.1:59151/voices
 ```
 
-Generate speech directly:
+Generate speech:
 
 ```bash
 curl \
@@ -152,46 +115,33 @@ curl \
   -d '{"text":"Hello from KittenTTS Docker HTTP","voice":"Bruno","speed":1.0}'
 ```
 
-That response includes metadata plus a `url` field that points to a downloadable WAV file under `/audio/...`.
+That response includes metadata plus a `url` field pointing to `/audio/...`.
 
 ## Operate the container
 
 View logs:
 
 ```bash
-docker compose logs -f
+docker logs -f kittentts-http
 ```
 
 Restart:
 
 ```bash
-docker compose restart
+docker restart kittentts-http
 ```
 
 Stop:
 
 ```bash
-docker compose stop
+docker stop kittentts-http
 ```
 
-Remove the container:
+Remove:
 
 ```bash
-docker compose down
+docker rm -f kittentts-http
 ```
-
-Rebuild from scratch after changing models:
-
-```bash
-docker compose build --no-cache
-docker compose up -d
-```
-
-## Notes
-
-- The image pre-downloads the selected Hugging Face model during `docker build` so the container can start without fetching model files at runtime.
-- The runtime is CPU-oriented by default.
-- The server exposes lightweight JSON endpoints for health, voices, and synthesis metadata, plus WAV files under `/audio/...`.
 
 ## Default runtime contract
 
